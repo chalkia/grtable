@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <title>grTable - URL Generator</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; line-height: 1.4; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 6px; margin-bottom: 10px; box-sizing: border-box; }
+    input.variable-width { width: auto; min-width: 50px; display: inline-block; margin-right: 5px; }
+    button { padding: 8px 16px; margin-top: 10px; font-size: 14px; margin-right: 5px; cursor: pointer; }
+    #output { margin-top: 20px; background: #f0f0f0; padding: 10px; word-break: break-word; border-left: 4px solid rgb(80, 80, 210); }
+    #footer { margin-top: 40px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+    .lang-bar { text-align: right; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="lang-bar">
+    <label style="display:inline;" for="gen-lang">🌐 Language: </label>
+    <select id="gen-lang" style="width:auto; display:inline;" onchange="switchGenLang()">
+      <option value="el" selected>Ελληνικά</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+
+  <h1 id="gen-title">Γεννήτρια URL για το grTable</h1>
+  <p id="gen-desc">Η ιστοσελίδα χρησιμοποιείται για τη δημιουργία ενός πίνακα με προκαθορισμένες στήλες (1 έως 6). Ο πίνακας μπορεί να χρησιμοποιηθεί ως αυτόνομο widget ή να ενσωματωθεί στο περιβάλλον του <b>Graasp.org</b> για αυτόματη αποθήκευση δεδομένων των μαθητών.</p>
+
+  <label id="lbl-title" for="title">Τίτλος Πίνακα</label>
+  <input type="text" id="title" placeholder="π.χ. Πείραμα Νόμου Ohm">
+
+  <div id="columns-container">
+    <label id="lbl-cols">Στήλες Πίνακα (Συμπληρώστε με τη σειρά)</label>
+    <input type="text" id="col1" placeholder="Στήλη 1">
+    <input type="text" id="col2" placeholder="Στήλη 2">
+    <input type="text" id="col3" placeholder="Στήλη 3">
+    <input type="text" id="col4" placeholder="Στήλη 4">
+    <input type="text" id="col5" placeholder="Στήλη 5">
+    <input type="text" id="col6" placeholder="Στήλη 6">
+  </div>
+
+  <label id="lbl-rowcount" for="rowCount">Αν θέλετε να προ-συμπληρώσετε την πρώτη στήλη (labels), εισάγετε πλήθος γραμμών:</label>
+  <input type="number" id="rowCount" min="0" max="20" onchange="generateRowFields()">
+  <div id="rows" style="margin-bottom:10px;"></div>
+
+  <button onclick="generateLink()">✅ <span id="btn-gen">Δημιουργία συνδέσμου</span></button>
+  <button onclick="copyLink()">📋 <span id="btn-copy">Αντιγραφή συνδέσμου</span></button>
+
+  <div id="output"></div>
+
+  <div id="footer">
+    grTable &bull; Δημιουργήθηκε από τον Κωστή Χαλκιαδάκη, Φυσικό υπ. ΕΚΦΕ Ρεθύμνου (2026)
+  </div>
+
+  <script>
+    const i18n = {
+      el: {
+        title: "Γεννήτρια URL για το grTable",
+        desc: "Η ιστοσελίδα χρησιμοποιείται για τη δημιουργία ενός πίνακα με προκαθορισμένες στήλες (1 έως 6). Ο πίνακας μπορεί να χρησιμοποιηθεί ως αυτόνομο widget ή να ενσωματωθεί στο περιβάλλον του <b>Graasp.org</b> για αυτόματη αποθήκευση δεδομένων των μαθητών.",
+        lblTitle: "Τίτλος Πίνακα",
+        lblCols: "Στήλες Πίνακα (Συμπληρώστε με τη σειρά)",
+        lblRowCount: "Αν θέλετε να προ-συμπληρώσετε την πρώτη στήλη (labels), εισάγετε πλήθος γραμμών:",
+        btnGen: "Δημιουργία συνδέσμου",
+        btnCopy: "Αντιγραφή συνδέσμου",
+        rowPlaceholder: "Γραμμή",
+        alertNoLink: "Παρακαλώ δημιουργήστε πρώτα τον σύνδεσμο.",
+        alertCopied: "Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!",
+        linkText: "Παραγόμενος Σύνδεσμος για το Graasp:"
+      },
+      en: {
+        title: "grTable - URL Generator",
+        desc: "This tool creates a customized table with predefined columns (1 to 6). The generated link can be embedded as a standalone widget or integrated into <b>Graasp.org</b> to enable cloud autosave for students.",
+        lblTitle: "Table Title",
+        lblCols: "Table Columns (Fill in sequence)",
+        lblRowCount: "To pre-populate the first column (labels), enter number of rows:",
+        btnGen: "Generate Link",
+        btnCopy: "Copy Link",
+        rowPlaceholder: "Row",
+        alertNoLink: "Please generate the link first.",
+        alertCopied: "Link copied to clipboard!",
+        linkText: "Generated Widget URL for Graasp:"
+      }
+    };
+
+    function switchGenLang() {
+      const lang = document.getElementById('gen-lang').value;
+      const t = i18n[lang];
+      
+      document.getElementById('gen-title').innerText = t.title;
+      document.getElementById('gen-desc').innerHTML = t.desc;
+      document.getElementById('lbl-title').innerText = t.lblTitle;
+      document.getElementById('lbl-cols').innerText = t.lblCols;
+      document.getElementById('lbl-rowcount').innerText = t.lblRowCount;
+      document.getElementById('btn-gen').innerText = t.btnGen;
+      document.getElementById('btn-copy').innerText = t.btnCopy;
+      
+      const count = parseInt(document.getElementById('rowCount').value) || 0;
+      for(let i=1; i<=count; i++) {
+        const input = document.getElementById(`row${i}`);
+        if(input) input.placeholder = `${t.rowPlaceholder} ${i}`;
+      }
+    }
+
+    function generateRowFields() {
+      const count = parseInt(document.getElementById('rowCount').value);
+      const container = document.getElementById('rows');
+      const lang = document.getElementById('gen-lang').value;
+      container.innerHTML = '';
+      for (let i = 1; i <= count; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `row${i}`;
+        input.placeholder = `${i18n[lang].rowPlaceholder} ${i}`;
+        input.className = 'variable-width';
+        input.oninput = function () { this.size = this.value.length + 1; };
+        input.size = 10;
+        container.appendChild(input);
+      }
+    }
+
+    function generateLink() {
+      console.log("index.html: Παραγωγή συνδέσμου...");
+      const baseUrl = window.location.href.split('?')[0].replace('index.html', '') + 'table.html';
+      const params = new URLSearchParams();
+      
+      const title = document.getElementById('title').value;
+      if (title) params.append('title', title);
+
+      const lang = document.getElementById('gen-lang').value;
+      params.append('lang', lang);
+
+      for (let i = 1; i <= 6; i++) {
+        const val = document.getElementById(`col${i}`).value;
+        if (val) params.append(`col${i}`, val);
+      }
+
+      const rowCount = parseInt(document.getElementById('rowCount').value);
+      if (rowCount > 0) {
+        for (let i = 1; i <= rowCount; i++) {
+          const val = document.getElementById(`row${i}`).value;
+          if (val) params.append(`row${i}`, val);
+        }
+      }
+
+      const fullUrl = `${baseUrl}?${params.toString()}`;
+      const labelText = i18n[lang].linkText;
+      document.getElementById('output').innerHTML = `<strong>${labelText}</strong><br><a href="${fullUrl}" target="_blank">${fullUrl}</a>`;
+    }
+
+    function copyLink() {
+      const lang = document.getElementById('gen-lang').value;
+      const linkTag = document.querySelector('#output a');
+      if (!linkTag) {
+        alert(i18n[lang].alertNoLink);
+        return;
+      }
+      const tempInput = document.createElement('input');
+      tempInput.value = linkTag.href;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      alert(i18n[lang].alertCopied);
+    }
+  </script>
+</body>
+</html>
