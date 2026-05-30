@@ -2,7 +2,7 @@
 <html lang="el">
 <head>
   <meta charset="UTF-8">
-  <title>grTable - Widget</title>
+  <title>grTable - Graasp App</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://graasp.org/sdk/graasp-box-data.js"></script>
   <style>
@@ -13,24 +13,42 @@
     th { background-color: rgb(80, 80, 210); color: white; font-weight: bold; }
     tbody tr:nth-child(even) { background-color: #f2f4ff; }
     tbody tr:nth-child(odd) { background-color: #ffffff; }
-    button { margin-right: 10px; padding: 6px 12px; font-size: 14px; margin-bottom: 5px; cursor: pointer; }
+    button { padding: 6px 12px; font-size: 14px; margin-bottom: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; }
     textarea { resize: none; width: 100%; box-sizing: border-box; border: none; background: transparent; font-family: inherit; font-size: inherit; text-align: inherit; overflow: hidden; display: block; }
     textarea:focus { background: #fffde0; outline: 1px solid #aaa; }
+    
+    /* Settings Panel για τον Εκπαιδευτικό */
+    #teacher-settings { display: none; background: #f0f4f8; padding: 15px; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 20px; }
+    #teacher-settings label { font-weight: bold; display: block; margin-top: 8px; }
+    #teacher-settings input[type="text"] { width: 100%; padding: 5px; box-sizing: border-box; margin-bottom: 5px; }
+    
     #filename-container { display: none; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-    #filename-container input { padding: 4px; font-size: 14px; width: 200px; }
-    #footer { margin-top: 40px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
     .status-msg { font-size: 13px; color: #444; margin-left: 10px; font-style: italic; font-weight: bold; }
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
-    .warning-box { font-size: 13px; color: #c00; background: #fff3f3; padding: 8px; border-left: 3px solid #c00; margin-bottom: 15px; }
+    .warning-box { font-size: 13px; color: #c00; background: #fff3f3; padding: 8px; border-left: 3px solid #c00; margin-bottom: 15px; display: none; }
   </style>
 </head>
 <body>
 
+  <div id="teacher-settings">
+    <h3 style="margin-top:0; color:#24292f;">⚙️ Ρυθμίσεις Πίνακα (Ορατό μόνο σε εσάς)</h3>
+    <label id="cfg-title-lbl">Τίτλος Πίνακα:</label>
+    <input type="text" id="cfg-title" value="grTable">
+    
+    <label id="cfg-cols-lbl">Στήλες (διαχωρισμός με κόμμα ,):</label>
+    <input type="text" id="cfg-cols" placeholder="π.χ. Χρόνος (s), Ταχύτητα (m/s)">
+    
+    <label id="cfg-rows-lbl">Γραμμές / Labels πρώτης στήλης (διαχωρισμός με κόμμα ,):</label>
+    <input type="text" id="cfg-rows" placeholder="π.χ. Μέτρηση 1, Μέτρηση 2, Μέτρηση 3">
+    
+    <button onclick="saveConfigurations()" style="background: #2da44e; color: white; border: none; font-weight: bold; margin-top: 10px;">💾 Αποθήκευση Δομής</button>
+  </div>
+
   <div class="top-bar">
     <div>
-      <button id="btn-add-row">➕ Εισαγωγή γραμμής</button>
-      <button id="btn-export">📥 Αποθήκευση σε Excel</button>
-      <button id="btn-share">⬆️ Διαμοιρασμός αρχείου</button>
+      <button id="btn-add-row" onclick="addRow()">➕ Εισαγωγή γραμμής</button>
+      <button id="btn-export" onclick="prepareExport('save')">📥 Αποθήκευση σε Excel</button>
+      <button id="btn-share" onclick="prepareExport('share')">⬆️ Διαμοιρασμός αρχείου</button>
       <span id="save-status" class="status-msg"></span>
     </div>
     <div>
@@ -46,7 +64,7 @@
   <div id="filename-container">
     <label id="lbl-filename" for="filename">Όνομα αρχείου (χωρίς .xlsx):</label>
     <input type="text" id="filename" placeholder="Data">
-    <button id="btn-confirm-export">💾 Συνέχεια</button>
+    <button id="btn-confirm-export" onclick="finalizeExport()">💾 Συνέχεια</button>
   </div>
 
   <table id="data-table">

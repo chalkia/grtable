@@ -1,10 +1,11 @@
 // js/table-graasp.js
-console.log("table-graasp.js: Εκκίνηση διασύνδεσης.");
+console.log("table-graasp.js: Έναρξη έξυπνης διασύνδεσης.");
 
 const urlParams = new URLSearchParams(window.location.search);
 let graaspConnected = false;
+let userPermission = 'read'; // Προεπιλογή: Μαθητής
 
-// Λεξικό μεταφράσεων για το Widget
+// Εμπλουτισμένο λεξικό μεταφράσεων
 const widgetTranslations = {
   el: {
     add_row: "➕ Εισαγωγή γραμμής",
@@ -12,11 +13,14 @@ const widgetTranslations = {
     share_file: "⬆️ Διαμοιρασμός αρχείου",
     lbl_filename: "Όνομα αρχείου (χωρίς .xlsx):",
     btn_continue: "💾 Συνέχεια",
-    warning: "<b>Προσοχή!</b> Τα περιεχόμενα αποθηκεύονται αυτόματα στο Graasp. Χρησιμοποιήστε την εξαγωγή για τοπικό αντίγραφο.",
+    warning: "<b>Προσοχή!</b> Εκτός Graasp οι αλλαγές δεν αποθηκεύονται.",
     typing: "Πληκτρολόγηση...",
     saved: "Αποθηκεύτηκε στο Graasp!",
     err_save: "Σφάλμα αποθήκευσης.",
-    default_col: "Στήλη"
+    default_col: "Στήλη",
+    cfg_title: "Τίτλος Πίνακα:",
+    cfg_cols: "Στήλες (διαχωρισμός με κόμμα ,):",
+    cfg_rows: "Γραμμές / Labels πρώτης στήλης (διαχωρισμός με κόμμα ,):"
   },
   en: {
     add_row: "➕ Add Row",
@@ -24,17 +28,17 @@ const widgetTranslations = {
     share_file: "⬆️ Share File",
     lbl_filename: "Filename (without .xlsx):",
     btn_continue: "💾 Continue",
-    warning: "<b>Notice:</b> Content is autosaved to Graasp. Use Excel export for a local copy.",
+    warning: "<b>Notice:</b> Outside Graasp, changes are not saved.",
     typing: "Typing...",
     saved: "Saved to Graasp!",
     err_save: "Save error.",
-    default_col: "Column"
+    default_col: "Column",
+    cfg_title: "Table Title:",
+    cfg_cols: "Columns (comma separated ,):",
+    cfg_rows: "Rows / First column labels (comma separated ,):"
   }
 };
 
-/**
- * Αλλάζει τη γλώσσα των στοιχείων του Widget
- */
 function switchWidgetLang(langCode = null) {
   const lang = langCode || document.getElementById('widget-lang').value;
   document.getElementById('widget-lang').value = lang;
@@ -46,13 +50,15 @@ function switchWidgetLang(langCode = null) {
   document.getElementById('lbl-filename').innerText = t.lbl_filename;
   document.getElementById('btn-confirm-export').innerText = t.btn_continue;
   document.getElementById('warning-msg').innerHTML = t.warning;
+  
+  // Μεταφράσεις Panel
+  document.getElementById('cfg-title-lbl').innerText = t.cfg_title;
+  document.getElementById('cfg-cols-lbl').innerText = t.cfg_cols;
+  document.getElementById('cfg-rows-lbl').innerText = t.cfg_rows;
 }
 
-/**
- * Αρχικοποιεί και σχεδιάζει τον πίνακα στο DOM
- */
 function initTable(title, headers, rows) {
-  document.getElementById('table-title').textContent = title;
+  document.getElementById('table-title').textContent = title || "grTable";
   
   const headerRow = document.getElementById('table-header');
   headerRow.innerHTML = "";
@@ -68,91 +74,105 @@ function initTable(title, headers, rows) {
   if (rows && rows.length > 0) {
     rows.forEach(r => addRow(r));
   } else {
-    // Αν δεν υπάρχουν δεδομένα, φτιάξε 3 κενές γραμμές
     for (let i = 0; i < 3; i++) addRow();
   }
 }
 
 /**
- * Κατασκευάζει τον πίνακα από τις GET παραμέτρους του URL (Fallback ή Αρχικοποίηση)
+ * Καλούμενη όταν ο Εκπαιδευτικός πατάει "Αποθήκευση Δομής"
  */
-function buildFromUrl() {
-  console.log("table-graasp.js: Ανάγνωση παραμέτρων από URL.");
-  const lang = urlParams.get('lang') || 'el';
-  switchWidgetLang(lang);
+function saveConfigurations() {
+  const title = document.getElementById('cfg-title').value.trim() || "grTable";
+  const colsInput = document.getElementById('cfg-cols').value;
+  const rowsInput = document.getElementById('cfg-rows').value;
+  const lang = document.getElementById('widget-lang').value;
 
-  const titleParam = urlParams.get('title');
-  const title = titleParam ? decodeURIComponent(titleParam) : "Πίνακας";
+  // Μετατροπή των comma-separated strings σε πίνακες
+  let headers = colsInput.split(',').map(s => s.trim()).filter(s => s !== "");
+  if (headers.length === 0) headers = [widgetTranslations[lang].default_col + " 1"];
 
-  const headers = [];
-  for (let i = 1; i <= 6; i++) {
-    const col = urlParams.get(`col${i}`);
-    if (col) headers.push(decodeURIComponent(col));
-  }
+  let rowLabels = rowsInput.split(',').map(s => s.trim()).filter(s => s !== "");
   
-  if (headers.length === 0) {
-    const t = widgetTranslations[lang];
-    headers.push(`${t.default_col} A`, `${t.default_col} B`);
-  }
-
-  const initialRowsLabels = [];
-  for (let i = 1; i <= 20; i++) {
-    const rowParam = urlParams.get(`row${i}`);
-    if (rowParam) initialRowsLabels.push(decodeURIComponent(rowParam));
-  }
-
-  const rows = [];
-  if (initialRowsLabels.length > 0) {
-    initialRowsLabels.forEach(label => {
+  let rows = [];
+  if (rowLabels.length > 0) {
+    rows = rowLabels.map(label => {
       const r = [label];
       for (let i = 1; i < headers.length; i++) r.push("");
-      rows.push(r);
+      return r;
     });
   }
 
   initTable(title, headers, rows);
   
-  // Αν βρισκόμαστε στο Graasp, αποθηκεύουμε τη δομή αμέσως
-  if (graaspConnected) saveToGraasp();
+  if (graaspConnected) {
+    saveToGraasp();
+    alert(lang === 'el' ? "Η δομή αποθηκεύτηκε!" : "Structure saved successfully!");
+  }
+}
+
+/**
+ * Φόρτωση default τιμών ή ανάγνωση URL αν είμαστε εκτός Graasp
+ */
+function buildDefaults() {
+  console.log("table-graasp.js: Εκτός περιβάλλοντος Graasp ή άδειο storage. Έλεγχος για URL παραμέτρους...");
+  
+  // Εμφάνιση του κόκκινου warning box μόνο αν είμαστε εντελώς εκτός Graasp
+  if (!window.graasp || !window.graasp.boxData) {
+    document.getElementById('warning-msg').style.display = 'block';
+  }
+  
+  // Αν υπάρχουν παράμετροι στο URL (π.χ. από το index.html), φτιάξε τον πίνακα βάσει αυτών
+  if (urlParams.has('title') || urlParams.has('col1')) {
+    buildFromUrl();
+  } else {
+    // Αν δεν υπάρχει τίποτα, φτιάξε έναν απλό τυχαίο πίνακα
+    const lang = urlParams.get('lang') || 'el';
+    switchWidgetLang(lang);
+    const t = widgetTranslations[lang];
+    initTable("grTable", [`${t.default_col} A`, `${t.default_col} B`], [["", ""], ["", ""], ["", ""]]);
+  }
 }
 
 // === Graasp SDK Ενσωμάτωση ===
 if (window.graasp && window.graasp.boxData) {
   window.graasp.boxData.init().then(context => {
     graaspConnected = true;
-    console.log("table-graasp.js: Επιτυχής σύνδεση με Graasp API Context:", context);
-    
-    // Προσπάθεια φόρτωσης αποθηκευμένων δεδομένων χρήστη
+    userPermission = context.permission; // Λήψη δικαιωμάτων ('write', 'admin', 'read')
+
+    console.log("Δικαιώματα χρήστη στο Graasp:", userPermission);
+
+    // Αν είναι καθηγητής, εμφάνισε το Panel Ρυθμίσεων
+    if (userPermission === 'write' || userPermission === 'admin') {
+      document.getElementById('teacher-settings').style.display = 'block';
+    }
+
     window.graasp.boxData.get().then(savedData => {
       if (savedData && savedData.headers) {
-        console.log("table-graasp.js: Ανάκτηση δεδομένων από το Graasp Cloud storage.", savedData);
         if(savedData.lang) switchWidgetLang(savedData.lang);
         initTable(savedData.title, savedData.headers, savedData.rows);
+        
+        // Γέμισμα των πεδίων του panel με τα τρέχοντα δεδομένα
+        document.getElementById('cfg-title').value = savedData.title;
+        document.getElementById('cfg-cols').value = savedData.headers.join(', ');
+        // Πιάνουμε τα labels της 1ης στήλης
+        const labels = savedData.rows.map(r => r[0]).filter(l => l !== "");
+        document.getElementById('cfg-rows').value = labels.join(', ');
       } else {
-        console.log("table-graasp.js: Το Graasp storage είναι άδειο. Χρήση URL.");
-        buildFromUrl();
+        buildDefaults();
       }
-    }).catch(err => {
-      console.error("Σφάλμα κατά το graasp.boxData.get():", err);
-      buildFromUrl();
-    });
-  }).catch(err => {
-    console.error("Αποτυχία αρχικοποίησης Graasp SDK Context:", err);
-    buildFromUrl();
-  });
+    }).catch(() => buildDefaults());
+  }).catch(() => buildDefaults());
 } else {
-  console.log("table-graasp.js: Standalone λειτουργία εκτός Graasp.");
-  buildFromUrl();
+  buildDefaults();
 }
 
-// === Autosave & Debouncing Λογική ===
+// === Autosave με Debounce ===
 let saveTimeout;
 window.addEventListener('tableDataChanged', () => {
   if (!graaspConnected) return;
   const lang = document.getElementById('widget-lang').value;
   document.getElementById('save-status').innerText = widgetTranslations[lang].typing;
 
-  // Debounce 1 δευτερολέπτου για αποφυγή spamming του API κατά την πληκτρολόγηση
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveToGraasp, 1000);
 });
@@ -170,12 +190,9 @@ function saveToGraasp() {
     time: new Date().toISOString()
   };
 
-  console.log("table-graasp.js: Αποστολή δεδομένων στο Graasp...", payload);
-
   window.graasp.boxData.set(payload).then(() => {
     document.getElementById('save-status').innerText = widgetTranslations[lang].saved;
-  }).catch(err => {
-    console.error("Σφάλμα κατά το graasp.boxData.set():", err);
+  }).catch(() => {
     document.getElementById('save-status').innerText = widgetTranslations[lang].err_save;
   });
 }
