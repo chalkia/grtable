@@ -71,10 +71,13 @@ function initTable(title, headers, rows) {
   const tbody = document.getElementById('table-body');
   tbody.innerHTML = "";
 
+  // Ελέγχουμε αν ο χρήστης είναι εκπαιδευτικός
+  const isTeacher = (userPermission === 'write' || userPermission === 'admin');
+
   if (rows && rows.length > 0) {
-    rows.forEach(r => addRow(r));
+    rows.forEach(r => addRow(r, isTeacher));
   } else {
-    for (let i = 0; i < 3; i++) addRow();
+    for (let i = 0; i < 3; i++) addRow(null, isTeacher);
   }
 }
 

@@ -1,11 +1,9 @@
 // js/table-core.js
 console.log("table-core.js: Φορτώθηκε επιτυχώς.");
 
-// Σύνδεση του Click Event για την εισαγωγή νέας γραμμής
-document.getElementById('btn-add-row').addEventListener('click', () => addRow());
-
 /**
- * Δημιουργεί ένα δυναμικό textarea με auto-resize
+ * Δημιουργεί ένα δυναμικό textarea με auto-resize.
+ * Υποστηρίζει Read-Only λειτουργία με γκριζάρισμα για τους μαθητές.
  */
 function createFlexibleTextarea(readOnly = false, value = '') {
   const ta = document.createElement('textarea');
@@ -13,32 +11,34 @@ function createFlexibleTextarea(readOnly = false, value = '') {
   ta.readOnly = readOnly;
   ta.rows = 1;
   
+  // Αν το κελί είναι κλειδωμένο (π.χ. Label για μαθητή)
   if (readOnly) {
     ta.style.fontWeight = 'bold';
     ta.style.color = '#333';
+    ta.style.backgroundColor = '#f5f5f5'; // Οπτική ένδειξη
+    ta.style.cursor = 'not-allowed';
   }
 
-  // Λειτουργία αυτόματης προσαρμογής ύψους
   const autoResize = () => {
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
   };
   
-  // Ενημέρωση ύψους και trigger event για αποθήκευση στο Graasp
   ta.addEventListener('input', () => {
     autoResize();
+    // Ειδοποιούμε το table-graasp.js ότι υπήρξε πληκτρολόγηση για να κάνει auto-save
     window.dispatchEvent(new CustomEvent('tableDataChanged'));
   });
   
-  // Μικρή καθυστέρηση για σωστό υπολογισμό κατά το αρχικό rendering
+  // Αρχικός υπολογισμός ύψους
   setTimeout(autoResize, 50);
   return ta;
 }
 
 /**
- * Προσθέτει μια γραμμή στον πίνακα. Αν περαστούν τιμές, τις συμπληρώνει.
+ * Προσθέτει μια γραμμή στον πίνακα.
  */
-function addRow(initialValues = null) {
+function addRow(initialValues = null, isTeacher = false) {
   const tbody = document.getElementById('table-body');
   const tr = document.createElement('tr');
   const headersCount = document.querySelectorAll('#table-header th').length || 2;
@@ -47,8 +47,9 @@ function addRow(initialValues = null) {
     const td = document.createElement('td');
     const val = initialValues && initialValues[i] ? initialValues[i] : "";
     
-    // Η πρώτη στήλη κλειδώνει αν περιέχει προκαθορισμένα labels από τη γεννήτρια
-    const isReadOnly = (i === 0 && initialValues !== null && initialValues[0] !== "");
+    // Το κελί κλειδώνει ΜΟΝΟ αν: 
+    // είναι η 1η στήλη (i === 0) ΚΑΙ έχει κείμενο (val !== "") ΚΑΙ δεν είσαι ο εκπαιδευτικός
+    const isReadOnly = (i === 0 && val !== "" && !isTeacher);
     
     td.appendChild(createFlexibleTextarea(isReadOnly, val));
     tr.appendChild(td);
@@ -57,7 +58,8 @@ function addRow(initialValues = null) {
 }
 
 /**
- * Διαβάζει τον πίνακα από το DOM και επιστρέφει τη δομή και τις τιμές
+ * Διαβάζει τον πίνακα από το DOM (Οθόνη) και επιστρέφει Headers & Rows
+ * για να τα στείλει στο Excel ή στο Graasp.
  */
 function getTableDataStructure() {
   const headers = Array.from(document.querySelectorAll('#table-header th')).map(th => th.innerText);
